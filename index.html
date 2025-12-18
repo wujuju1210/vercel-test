@@ -26,7 +26,7 @@
 <body>
 <header>
   <h1>🏔️ 川西寒假出游时间协调</h1>
-  <p>第 6 阶段：填写并保存到 Supabase（非实时，刷新查看）</p>
+  <p>最终版：实时同步（无需刷新）</p>
 </header>
 <div class="container">
   <div class="card">
@@ -35,15 +35,15 @@
     <label style="margin-top:12px">选择你可以出游的日期</label>
     <div id="dates" class="dates"></div>
     <button onclick="save()">保存 / 更新我的时间</button>
-    <div class="hint">保存后，刷新页面即可看到汇总更新</div>
+    <div class="hint">任何人保存后，所有人的页面会立刻更新</div>
   </div>
   <div class="card">
-    <h3>📊 当前汇总</h3>
+    <h3>📊 实时汇总</h3>
     <table id="summary"><tr><th>昵称</th><th>可出游天数</th></tr></table>
   </div>
 </div>
 <script>
-  // ⬇️ 替换成你自己的 Supabase 信息（保持和之前一致）
+  // ⬇️ 保持你自己的 Supabase 信息
   const SUPABASE_URL = "https://lingyhmrwziclplqlogj.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxpbmd5aG1yd3ppY2xwbHFsb2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDc5OTcsImV4cCI6MjA4MTYyMzk5N30.a9LJNYLWtl9z4j8pqtiykTxHivwBJdSFfkFDqjAtDM8";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -67,7 +67,7 @@
 
   async function load(){
     const {data,error}=await sb.from('trip').select('name,dates');
-    if(error){summary.innerHTML=`<tr><td colspan="2">读取失败：${error.message}</td></tr>`;return}
+    if(error){summary.innerHTML=`<tr><td colspan=\"2\">读取失败：${error.message}</td></tr>`;return}
     summary.innerHTML='<tr><th>昵称</th><th>可出游天数</th></tr>'+(data||[]).map(r=>`<tr><td>${r.name}</td><td>${(r.dates||[]).length}</td></tr>`).join('');
   }
 
@@ -75,11 +75,16 @@
     const name=nameInput.value.trim();
     if(!name){alert('请填写昵称');return}
     const dates=[...selected];
-    const {error}=await sb.from('trip').upsert({name,dates});
+    const {error}=await sb.from('trip').upsert({name,dates},{onConflict:'name'});
     if(error){alert('保存失败：'+error.message);return}
-    alert('已保存，刷新页面可看到更新');
-    load();
   }
+
+  // 🔥 实时订阅：任何 INSERT / UPDATE 都会触发
+  sb.channel('trip-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip' }, () => {
+      load();
+    })
+    .subscribe();
 
   load();
 </script>
