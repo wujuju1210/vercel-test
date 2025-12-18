@@ -4,58 +4,47 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>川西寒假出游时间协调</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: linear-gradient(180deg, #eaf2ff, #f7f8fa);
-      color: #333;
-    }
-    header {
-      text-align: center;
-      padding: 32px 16px 20px;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 26px;
-    }
-    header p {
-      margin-top: 8px;
-      color: #666;
-      font-size: 14px;
-    }
-    .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 16px;
-    }
-    .card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 18px;
-      margin-bottom: 18px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-    }
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:linear-gradient(180deg,#eaf2ff,#f7f8fa);color:#333}
+    header{text-align:center;padding:32px 16px 20px}
+    header h1{margin:0;font-size:26px}
+    header p{margin-top:8px;color:#666;font-size:14px}
+    .container{max-width:900px;margin:auto;padding:16px}
+    .card{background:#fff;border-radius:16px;padding:18px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:10px 6px;border-bottom:1px solid #eee;text-align:left}
   </style>
 </head>
 <body>
-
 <header>
   <h1>🏔️ 川西寒假出游时间协调</h1>
-  <p>8 人 · 1 月 10 日 – 2 月 20 日</p>
+  <p>第 5 阶段：只读 Supabase（不写、不实时）</p>
 </header>
-
 <div class="container">
   <div class="card">
-    <h3>🎉 页面加载成功</h3>
-    <p>如果你能看到这个页面，说明：</p>
-    <ul>
-      <li>✔ Vercel 正常</li>
-      <li>✔ 复杂 HTML 正常</li>
-      <li>✔ 可以继续加功能了</li>
-    </ul>
+    <h3>📊 从 Supabase 读取的数据</h3>
+    <table id="summary"><tr><th>昵称</th><th>可出游天数</th></tr></table>
   </div>
 </div>
+<script>
+  // ⬇️ 替换成你自己的 Supabase 信息（保持和之前一致）
+  const SUPABASE_URL = "https://lingyhmrwziclplqlogj.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxpbmd5aG1yd3ppY2xwbHFsb2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDc5OTcsImV4cCI6MjA4MTYyMzk5N30.a9LJNYLWtl9z4j8pqtiykTxHivwBJdSFfkFDqjAtDM8";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  async function load() {
+    const { data, error } = await sb.from('trip').select('name, dates');
+    const table = document.getElementById('summary');
+    if (error) {
+      table.innerHTML = `<tr><td colspan="2">读取失败：${error.message}</td></tr>`;
+      return;
+    }
+    const rows = data || [];
+    table.innerHTML = '<tr><th>昵称</th><th>可出游天数</th></tr>' +
+      rows.map(r => `<tr><td>${r.name}</td><td>${(r.dates||[]).length}</td></tr>`).join('');
+  }
+  load();
+</script>
 </body>
 </html>
