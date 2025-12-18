@@ -27,24 +27,20 @@
     .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#f0f2f5;color:#555;font-size:12px;margin-left:8px}
 
     /* matrix */
-    .matrixWrap{overflow:auto;border-radius:14px;border:1px solid #eee}
+    .matrixWrap{overflow:auto;border-radius:14px;border:1px solid #eee;max-height:420px}
     table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
-    th,td{padding:8px 8px;border-bottom:1px solid #f1f1f1;white-space:nowrap}
+    th,td{padding:6px 6px;border-bottom:1px solid #f1f1f1;white-space:nowrap}
     thead th{position:sticky;top:0;background:#fff;z-index:2}
     .stickyCol{position:sticky;left:0;background:#fff;z-index:3;border-right:1px solid #f1f1f1}
-    .cell{width:18px;height:18px;border-radius:6px;display:inline-block}
+    .cell{width:14px;height:14px;border-radius:4px;display:inline-block}
     .free{background:#2ecc71}
     .busy{background:#e6e8ec}
     .count8{color:#2ecc71;font-weight:700}
     .count6{color:#f39c12;font-weight:700}
     .countLow{color:#999}
-    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#666;align-items:center}
-    .legend span{display:flex;gap:6px;align-items:center}
 
-    .recommend{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .recCard{background:#f7f9ff;border:1px solid #e7ecff;border-radius:14px;padding:10px 12px}
-    .recTitle{font-weight:700}
-    .recSub{font-size:12px;color:#666;margin-top:4px}
+    .matrixTools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+    .matrixTools button{width:auto;padding:6px 10px;font-size:13px;border-radius:8px}
 
     .err{color:#c0392b;font-size:12px;margin-top:8px}
   </style>
@@ -75,6 +71,12 @@
     </div>
 
     <div class="card">
+      <div class="matrixTools">
+        <button onclick="setWindow(7)">近 7 天</button>
+        <button onclick="setWindow(14)">近 14 天</button>
+        <button onclick="setWindow(30)">近 30 天</button>
+        <button onclick="setWindow(0)">全部</button>
+      </div>
       <div class="recommend" id="recommend"></div>
       <div class="hint" style="margin-top:10px">
         下面是「按日期」的可视化：每列一天，每行一个人。绿色=空闲，灰色=有事/不可出游。左侧有每天可行人数。
@@ -95,8 +97,8 @@
 
 <script>
   // ⬇️ 保持你自己的 Supabase 信息
-  const SUPABASE_URL = "https://lingyhmrwziclplqlogj.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxpbmd5aG1yd3ppY2xwbHFsb2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDc5OTcsImV4cCI6MjA4MTYyMzk5N30.a9LJNYLWtl9z4j8pqtiykTxHivwBJdSFfkFDqjAtDM8";
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const start = new Date(2025, 0, 10); // 2025-01-10（本地时区）
@@ -152,7 +154,9 @@
   }
 
   // 生成日期按钮
-  const allDates = [];
+  let allDates = [];
+  let visibleDates = [];
+  let windowSize = 0; // 0 = 全部
   for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
     const s = fmt(d);
     allDates.push(s);
@@ -264,7 +268,14 @@
     recEl.appendChild(card);
   }
 
+  function setWindow(n){
+    windowSize = n;
+    load();
+  }
+
   function renderMatrix(rows){
+    // 计算可见日期窗口
+    visibleDates = windowSize>0 ? allDates.slice(0, windowSize) : allDates.slice();
     const names = (rows||[]).map(r=>r.name).sort((a,b)=>a.localeCompare(b,'zh'));
 
     // dateCounts
@@ -293,7 +304,7 @@
     html += '<thead><tr>';
     html += '<th class="stickyCol">成员</th>';
     html += '<th class="stickyCol" style="left:72px">可行</th>';
-    for(const d of allDates){
+    for(const d of visibleDates){
       html += `<th title="${d}">${mmdd(d)}</th>`;
     }
     html += '</tr></thead>';
@@ -303,7 +314,7 @@
     html += '<tr>';
     html += '<td class="stickyCol" style="font-weight:700">每天人数</td>';
     html += '<td class="stickyCol" style="left:72px"></td>';
-    for(const d of allDates){
+    for(const d of visibleDates){
       const c = dateCounts[d]||0;
       const cls = (c===names.length && names.length>0) ? 'count8' : (c>=6 ? 'count6' : 'countLow');
       html += `<td><span class="${cls}">${c}</span></td>`;
@@ -317,7 +328,7 @@
       html += '<tr>';
       html += `<td class="stickyCol">${name}</td>`;
       html += `<td class="stickyCol" style="left:72px">${freeCount}</td>`;
-      for(const d of allDates){
+      for(const d of visibleDates){
         const isFree = s.has(d);
         html += `<td><i class="cell ${isFree?'free':'busy'}" title="${name} · ${d} · ${isFree?'可出游':'不可出游'}"></i></td>`;
       }
