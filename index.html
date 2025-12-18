@@ -12,18 +12,33 @@
     header p{margin-top:8px;color:#666;font-size:14px}
     .container{max-width:900px;margin:auto;padding:16px}
     .card{background:#fff;border-radius:16px;padding:18px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
+    label{display:block;font-weight:600;margin-bottom:6px}
+    input{width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;font-size:15px}
+    .dates{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:260px;overflow-y:auto}
+    .date{background:#f0f2f5;border-radius:10px;padding:8px 4px;text-align:center;font-size:12px;cursor:pointer}
+    .date.selected{background:#4facfe;color:#fff;font-weight:600}
+    button{margin-top:14px;width:100%;padding:12px;border-radius:12px;border:none;font-size:16px;background:#1677ff;color:#fff;cursor:pointer}
     table{width:100%;border-collapse:collapse;font-size:14px}
     th,td{padding:10px 6px;border-bottom:1px solid #eee;text-align:left}
+    .hint{font-size:12px;color:#888;margin-top:6px}
   </style>
 </head>
 <body>
 <header>
   <h1>🏔️ 川西寒假出游时间协调</h1>
-  <p>第 5 阶段：只读 Supabase（不写、不实时）</p>
+  <p>第 6 阶段：填写并保存到 Supabase（非实时，刷新查看）</p>
 </header>
 <div class="container">
   <div class="card">
-    <h3>📊 从 Supabase 读取的数据</h3>
+    <label>你的昵称（唯一）</label>
+    <input id="nameInput" placeholder="例如：阿杰" />
+    <label style="margin-top:12px">选择你可以出游的日期</label>
+    <div id="dates" class="dates"></div>
+    <button onclick="save()">保存 / 更新我的时间</button>
+    <div class="hint">保存后，刷新页面即可看到汇总更新</div>
+  </div>
+  <div class="card">
+    <h3>📊 当前汇总</h3>
     <table id="summary"><tr><th>昵称</th><th>可出游天数</th></tr></table>
   </div>
 </div>
@@ -33,17 +48,39 @@
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxpbmd5aG1yd3ppY2xwbHFsb2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDc5OTcsImV4cCI6MjA4MTYyMzk5N30.a9LJNYLWtl9z4j8pqtiykTxHivwBJdSFfkFDqjAtDM8";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  async function load() {
-    const { data, error } = await sb.from('trip').select('name, dates');
-    const table = document.getElementById('summary');
-    if (error) {
-      table.innerHTML = `<tr><td colspan="2">读取失败：${error.message}</td></tr>`;
-      return;
-    }
-    const rows = data || [];
-    table.innerHTML = '<tr><th>昵称</th><th>可出游天数</th></tr>' +
-      rows.map(r => `<tr><td>${r.name}</td><td>${(r.dates||[]).length}</td></tr>`).join('');
+  const start = new Date('2025-01-10');
+  const end = new Date('2025-02-20');
+  const datesDiv = document.getElementById('dates');
+  const summary = document.getElementById('summary');
+  const selected = new Set();
+
+  function fmt(d){return d.toISOString().slice(0,10)}
+
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    const s=fmt(d);
+    const div=document.createElement('div');
+    div.className='date';
+    div.textContent=s.slice(5);
+    div.onclick=()=>{div.classList.toggle('selected'); div.classList.contains('selected')?selected.add(s):selected.delete(s)};
+    datesDiv.appendChild(div);
   }
+
+  async function load(){
+    const {data,error}=await sb.from('trip').select('name,dates');
+    if(error){summary.innerHTML=`<tr><td colspan="2">读取失败：${error.message}</td></tr>`;return}
+    summary.innerHTML='<tr><th>昵称</th><th>可出游天数</th></tr>'+(data||[]).map(r=>`<tr><td>${r.name}</td><td>${(r.dates||[]).length}</td></tr>`).join('');
+  }
+
+  async function save(){
+    const name=nameInput.value.trim();
+    if(!name){alert('请填写昵称');return}
+    const dates=[...selected];
+    const {error}=await sb.from('trip').upsert({name,dates});
+    if(error){alert('保存失败：'+error.message);return}
+    alert('已保存，刷新页面可看到更新');
+    load();
+  }
+
   load();
 </script>
 </body>
