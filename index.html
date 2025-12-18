@@ -7,89 +7,340 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:linear-gradient(180deg,#eaf2ff,#f7f8fa);color:#333}
-    header{text-align:center;padding:32px 16px 20px}
+    header{text-align:center;padding:28px 16px 14px}
     header h1{margin:0;font-size:26px}
     header p{margin-top:8px;color:#666;font-size:14px}
-    .container{max-width:900px;margin:auto;padding:16px}
+    .container{max-width:1100px;margin:auto;padding:16px}
     .card{background:#fff;border-radius:16px;padding:18px;margin-bottom:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
+    .row{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:980px){.row{grid-template-columns:360px 1fr}}
+
     label{display:block;font-weight:600;margin-bottom:6px}
     input{width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;font-size:15px}
-    .dates{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:260px;overflow-y:auto}
-    .date{background:#f0f2f5;border-radius:10px;padding:8px 4px;text-align:center;font-size:12px;cursor:pointer}
-    .date.selected{background:#4facfe;color:#fff;font-weight:600}
-    button{margin-top:14px;width:100%;padding:12px;border-radius:12px;border:none;font-size:16px;background:#1677ff;color:#fff;cursor:pointer}
-    table{width:100%;border-collapse:collapse;font-size:14px}
-    th,td{padding:10px 6px;border-bottom:1px solid #eee;text-align:left}
-    .hint{font-size:12px;color:#888;margin-top:6px}
+
+    .dates{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;max-height:260px;overflow-y:auto}
+    .date{background:#f0f2f5;border-radius:10px;padding:8px 4px;text-align:center;font-size:12px;cursor:pointer;user-select:none}
+    .date.selected{background:linear-gradient(135deg,#4facfe,#00f2fe);color:#fff;font-weight:700}
+
+    button{margin-top:14px;width:100%;padding:12px;border-radius:12px;border:none;font-size:16px;background:linear-gradient(135deg,#1677ff,#69b1ff);color:#fff;cursor:pointer}
+    .hint{font-size:12px;color:#888;margin-top:6px;line-height:1.4}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#f0f2f5;color:#555;font-size:12px;margin-left:8px}
+
+    /* matrix */
+    .matrixWrap{overflow:auto;border-radius:14px;border:1px solid #eee}
+    table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+    th,td{padding:8px 8px;border-bottom:1px solid #f1f1f1;white-space:nowrap}
+    thead th{position:sticky;top:0;background:#fff;z-index:2}
+    .stickyCol{position:sticky;left:0;background:#fff;z-index:3;border-right:1px solid #f1f1f1}
+    .cell{width:18px;height:18px;border-radius:6px;display:inline-block}
+    .free{background:#2ecc71}
+    .busy{background:#e6e8ec}
+    .count8{color:#2ecc71;font-weight:700}
+    .count6{color:#f39c12;font-weight:700}
+    .countLow{color:#999}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:#666;align-items:center}
+    .legend span{display:flex;gap:6px;align-items:center}
+
+    .recommend{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .recCard{background:#f7f9ff;border:1px solid #e7ecff;border-radius:14px;padding:10px 12px}
+    .recTitle{font-weight:700}
+    .recSub{font-size:12px;color:#666;margin-top:4px}
+
+    .err{color:#c0392b;font-size:12px;margin-top:8px}
   </style>
 </head>
 <body>
 <header>
   <h1>🏔️ 川西寒假出游时间协调</h1>
-  <p>最终版：实时同步（无需刷新）</p>
+  <p>最终版：实时同步 + 可视化时间轴（1/10–2/20）</p>
 </header>
+
 <div class="container">
-  <div class="card">
-    <label>你的昵称（唯一）</label>
-    <input id="nameInput" placeholder="例如：阿杰" />
-    <label style="margin-top:12px">选择你可以出游的日期</label>
-    <div id="dates" class="dates"></div>
-    <button onclick="save()">保存 / 更新我的时间</button>
-    <div class="hint">任何人保存后，所有人的页面会立刻更新</div>
-  </div>
-  <div class="card">
-    <h3>📊 实时汇总</h3>
-    <table id="summary"><tr><th>昵称</th><th>可出游天数</th></tr></table>
+  <div class="row">
+
+    <div class="card">
+      <label>你的昵称（唯一）<span class="pill" id="countPill">已选 0 天</span></label>
+      <input id="nameInput" placeholder="例如：阿杰" />
+
+      <label style="margin-top:12px">点选你可以出游的日期</label>
+      <div id="dates" class="dates"></div>
+
+      <button onclick="save()">保存 / 更新我的时间</button>
+      <div class="hint">
+        说明：绿色表示你“可出游”的日期。<br/>
+        实时同步：任何人保存后，所有人的汇总会立刻更新。<br/>
+        如果你发现“已选天数”异常，通常是历史数据里 dates 字段不是数组——本页会自动兼容并修正。
+      </div>
+      <div class="err" id="saveErr" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <div class="recommend" id="recommend"></div>
+      <div class="hint" style="margin-top:10px">
+        下面是「按日期」的可视化：每列一天，每行一个人。绿色=空闲，灰色=有事/不可出游。左侧有每天可行人数。
+      </div>
+      <div class="matrixWrap" style="margin-top:10px">
+        <table id="matrix"></table>
+      </div>
+      <div class="legend">
+        <span><i class="cell free"></i>可出游</span>
+        <span><i class="cell busy"></i>不可出游</span>
+        <span>人数：<b class="count8">8</b> 全员</span>
+        <span>人数：<b class="count6">≥6</b> 大多数</span>
+      </div>
+    </div>
+
   </div>
 </div>
+
 <script>
   // ⬇️ 保持你自己的 Supabase 信息
   const SUPABASE_URL = "https://lingyhmrwziclplqlogj.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxpbmd5aG1yd3ppY2xwbHFsb2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDc5OTcsImV4cCI6MjA4MTYyMzk5N30.a9LJNYLWtl9z4j8pqtiykTxHivwBJdSFfkFDqjAtDM8";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const start = new Date('2025-01-10');
-  const end = new Date('2025-02-20');
-  const datesDiv = document.getElementById('dates');
-  const summary = document.getElementById('summary');
-  const selected = new Set();
+  const start = new Date(2025, 0, 10); // 2025-01-10（本地时区）
+  const end   = new Date(2025, 1, 20); // 2025-02-20（本地时区）
 
-  // 使用本地时区格式化日期，避免 UTC 偏移
+  const datesDiv = document.getElementById('dates');
+  const matrixEl = document.getElementById('matrix');
+  const countPill = document.getElementById('countPill');
+  const recEl = document.getElementById('recommend');
+  const saveErr = document.getElementById('saveErr');
+
+  const selected = new Set();
+  const dateCells = new Map(); // dateStr -> div
+
   function fmt(d){
     const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
     return `${y}-${m}-${day}`;
   }
 
-  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
-    const s=fmt(d);
-    const div=document.createElement('div');
-    div.className='date';
-    div.textContent=s.slice(5);
-    div.onclick=()=>{div.classList.toggle('selected'); div.classList.contains('selected')?selected.add(s):selected.delete(s)};
+  function mmdd(dateStr){
+    return dateStr.slice(5).replace('-', '/');
+  }
+
+  function normalizeDates(val){
+    // 兼容历史数据：text[] / jsonb array / 逗号字符串 / JSON 字符串
+    if (Array.isArray(val)) return val.filter(Boolean);
+    if (val == null) return [];
+    if (typeof val === 'string') {
+      const s = val.trim();
+      if (!s) return [];
+      if (s.startsWith('[') && s.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(s);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+        } catch { /* ignore */ }
+      }
+      // 兜底：逗号分隔
+      return s.split(',').map(x=>x.trim()).filter(Boolean);
+    }
+    // 其他类型（比如对象）
+    try {
+      const parsed = JSON.parse(String(val));
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function updateCountPill(){
+    countPill.textContent = `已选 ${selected.size} 天`;
+  }
+
+  // 生成日期按钮
+  const allDates = [];
+  for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    const s = fmt(d);
+    allDates.push(s);
+    const div = document.createElement('div');
+    div.className = 'date';
+    div.textContent = mmdd(s);
+    div.onclick = () => {
+      div.classList.toggle('selected');
+      if (div.classList.contains('selected')) selected.add(s); else selected.delete(s);
+      updateCountPill();
+    };
     datesDiv.appendChild(div);
+    dateCells.set(s, div);
+  }
+  updateCountPill();
+
+  // 读取某个昵称的已保存选择，并回填 UI
+  async function hydrateSelectionForName(name){
+    // 清空当前选择
+    for (const s of selected) { const el = dateCells.get(s); if (el) el.classList.remove('selected'); }
+    selected.clear();
+
+    if (!name) { updateCountPill(); return; }
+
+    const { data, error } = await sb.from('trip').select('dates').eq('name', name).maybeSingle();
+    if (error) return; // 不打断
+
+    const arr = normalizeDates(data?.dates);
+    for (const ds of arr) {
+      if (dateCells.has(ds)) {
+        selected.add(ds);
+        dateCells.get(ds).classList.add('selected');
+      }
+    }
+    updateCountPill();
+  }
+
+  // 当昵称输入完成（失焦）时回填
+  nameInput.addEventListener('blur', () => {
+    hydrateSelectionForName(nameInput.value.trim());
+  });
+
+  async function save(){
+    saveErr.style.display='none';
+    const name = nameInput.value.trim();
+    if(!name){alert('请填写昵称');return}
+
+    const dates = [...selected];
+    const { error } = await sb.from('trip').upsert({ name, dates }, { onConflict: 'name' });
+    if(error){
+      saveErr.style.display='block';
+      saveErr.textContent = '保存失败：' + error.message;
+      return;
+    }
+  }
+
+  function renderRecommend(dateCounts, names){
+    // 找“全员可行”的最长连续段；如果没有，找“人数最多”的最长连续段
+    const best = { score: -1, len: 0, startIdx: -1, endIdx: -1, minCount: -1 };
+
+    function consider(minCountTarget){
+      let i=0;
+      while(i<allDates.length){
+        if(dateCounts[allDates[i]] >= minCountTarget){
+          let j=i;
+          while(j<allDates.length && dateCounts[allDates[j]] >= minCountTarget) j++;
+          const len = j-i;
+          const score = minCountTarget*1000 + len; // 先人数再长度
+          if(score > best.score){
+            best.score = score;
+            best.len = len;
+            best.startIdx = i;
+            best.endIdx = j-1;
+            best.minCount = minCountTarget;
+          }
+          i=j;
+        } else i++;
+      }
+    }
+
+    // 优先找 8 人，其次 7、6
+    consider(names.length);
+    if(best.score<0 && names.length>=7) consider(7);
+    if(best.score<0 && names.length>=6) consider(6);
+
+    // 如果仍然没有，就找人数最高的连续段（>=1）
+    if(best.score<0){
+      let maxC = 0;
+      for(const d of allDates) maxC = Math.max(maxC, dateCounts[d]||0);
+      consider(maxC);
+    }
+
+    recEl.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'recCard';
+
+    if(best.startIdx===-1){
+      card.innerHTML = `<div class="recTitle">暂无推荐窗口</div><div class="recSub">还没有人填写，或没有任何一天可行。</div>`;
+      recEl.appendChild(card);
+      return;
+    }
+
+    const startD = allDates[best.startIdx];
+    const endD = allDates[best.endIdx];
+    card.innerHTML = `
+      <div class="recTitle">推荐窗口：${startD} ～ ${endD}</div>
+      <div class="recSub">连续 ${best.len} 天；每一天至少 ${best.minCount} 人可行（共 ${names.length} 人）</div>
+    `;
+    recEl.appendChild(card);
+  }
+
+  function renderMatrix(rows){
+    const names = (rows||[]).map(r=>r.name).sort((a,b)=>a.localeCompare(b,'zh'));
+
+    // dateCounts
+    const dateCounts = Object.fromEntries(allDates.map(d=>[d,0]));
+
+    // map: name -> set(dates)
+    const byName = new Map();
+    for (const r of (rows||[])){
+      const arr = normalizeDates(r.dates);
+      const s = new Set(arr);
+      byName.set(r.name, s);
+      for(const d of arr){ if(dateCounts[d]!=null) dateCounts[d] += 1; }
+
+      // 🔧 如果历史数据不是数组（导致“66天”），这里顺手纠正一次（不打扰用户）
+      if (!Array.isArray(r.dates) && r.name) {
+        sb.from('trip').upsert({ name: r.name, dates: arr }, { onConflict: 'name' });
+      }
+    }
+
+    renderRecommend(dateCounts, names);
+
+    // build table
+    let html = '';
+
+    // header
+    html += '<thead><tr>';
+    html += '<th class="stickyCol">成员</th>';
+    html += '<th class="stickyCol" style="left:72px">可行</th>';
+    for(const d of allDates){
+      html += `<th title="${d}">${mmdd(d)}</th>`;
+    }
+    html += '</tr></thead>';
+
+    // body: first row counts
+    html += '<tbody>';
+    html += '<tr>';
+    html += '<td class="stickyCol" style="font-weight:700">每天人数</td>';
+    html += '<td class="stickyCol" style="left:72px"></td>';
+    for(const d of allDates){
+      const c = dateCounts[d]||0;
+      const cls = (c===names.length && names.length>0) ? 'count8' : (c>=6 ? 'count6' : 'countLow');
+      html += `<td><span class="${cls}">${c}</span></td>`;
+    }
+    html += '</tr>';
+
+    // each person row
+    for(const name of names){
+      const s = byName.get(name) || new Set();
+      const freeCount = [...s].filter(d=>dateCells.has(d)).length;
+      html += '<tr>';
+      html += `<td class="stickyCol">${name}</td>`;
+      html += `<td class="stickyCol" style="left:72px">${freeCount}</td>`;
+      for(const d of allDates){
+        const isFree = s.has(d);
+        html += `<td><i class="cell ${isFree?'free':'busy'}" title="${name} · ${d} · ${isFree?'可出游':'不可出游'}"></i></td>`;
+      }
+      html += '</tr>';
+    }
+
+    html += '</tbody>';
+
+    matrixEl.innerHTML = html;
   }
 
   async function load(){
-    const {data,error}=await sb.from('trip').select('name,dates');
-    if(error){summary.innerHTML=`<tr><td colspan=\"2\">读取失败：${error.message}</td></tr>`;return}
-    summary.innerHTML='<tr><th>昵称</th><th>可出游天数</th></tr>'+(data||[]).map(r=>`<tr><td>${r.name}</td><td>${(r.dates||[]).length}</td></tr>`).join('');
+    const { data, error } = await sb.from('trip').select('name, dates');
+    if (error) {
+      matrixEl.innerHTML = `<tbody><tr><td>读取失败：${error.message}</td></tr></tbody>`;
+      return;
+    }
+    renderMatrix(data || []);
   }
 
-  async function save(){
-    const name=nameInput.value.trim();
-    if(!name){alert('请填写昵称');return}
-    const dates=[...selected];
-    const {error}=await sb.from('trip').upsert({name,dates},{onConflict:'name'});
-    if(error){alert('保存失败：'+error.message);return}
-  }
-
-  // 🔥 实时订阅：任何 INSERT / UPDATE 都会触发
+  // 实时订阅：任何 INSERT / UPDATE / DELETE 都会触发重新渲染
   sb.channel('trip-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip' }, () => {
-      load();
-    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip' }, () => load())
     .subscribe();
 
   load();
