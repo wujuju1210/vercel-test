@@ -175,11 +175,15 @@
 
   // 读取某个昵称的已保存选择，并回填 UI
   async function hydrateSelectionForName(name){
-    // 清空当前选择
-    for (const s of selected) { const el = dateCells.get(s); if (el) el.classList.remove('selected'); }
-    selected.clear();
-
+    // 只有在填写了昵称时才回填；否则不要清空用户正在点的选择
     if (!name) { updateCountPill(); return; }
+
+    // 清空当前选择（仅用于回填已有数据）
+    for (const s of selected) {
+      const el = dateCells.get(s);
+      if (el) el.classList.remove('selected');
+    }
+    selected.clear();
 
     const { data, error } = await sb.from('trip').select('dates').eq('name', name).maybeSingle();
     if (error) return; // 不打断
