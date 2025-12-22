@@ -57,6 +57,7 @@
     <div class="card">
       <label>你的昵称（唯一）<span class="pill" id="countPill">已选 0 天</span></label>
       <input id="nameInput" placeholder="例如：阿杰" />
+      <button style="margin-top:8px" onclick="hydrateSelectionForName(nameInput.value.trim())">加载我之前的选择</button>
 
       <label style="margin-top:12px">点选你可以出游的日期</label>
       <div id="dates" class="dates"></div>
@@ -198,9 +199,9 @@
     updateCountPill();
   }
 
-  // 当昵称输入完成（失焦）时回填
-  nameInput.addEventListener('blur', () => {
-    hydrateSelectionForName(nameInput.value.trim());
+  // ❌ 移除失焦自动回填（会打断点选）
+// 改为：仅在用户主动点击“加载我之前的选择”时回填
+
   });
 
   async function save(){
